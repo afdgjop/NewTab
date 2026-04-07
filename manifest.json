@@ -1,0 +1,26 @@
+{
+  "manifest_version": 3,
+  "name": "新标签页",
+  "version": "1.0",
+  "permissions": [
+    "bookmarks",
+    "favicon",
+    "storage"
+  ],
+  "host_permissions": [
+    "https://icons.duckduckgo.com/*"
+  ],
+  "chrome_url_overrides": {
+    "newtab": "newtab.html"
+  },
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "assets/*"
+      ],
+      "matches": [
+        "<all_urls>"
+      ]
+    }
+  ]
+}

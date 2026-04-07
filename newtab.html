@@ -1,0 +1,549 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <title>NewTab</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --glass-bg: rgba(255, 255, 255, 0.15);
+            --glass-border: rgba(255, 255, 255, 0.2);
+            --text-color: #ffffff;
+            --local-bg: url('assets/background.jpg');
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            background: var(--local-bg) no-repeat center center fixed;
+            background-size: cover;
+            height: 100vh;
+            color: var(--text-color);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            overflow-y: auto;
+        }
+
+        .search-container {
+            margin-top: 80px;
+            width: 100%;
+            max-width: 600px;
+            margin-bottom: 50px;
+            position: relative;
+        }
+
+        .search-bar {
+            width: 100%;
+            height: 50px;
+            background: rgba(255, 255, 255, 0.85);
+            border-radius: 20px;
+            border: none;
+            padding: 0 50px;
+            font-size: 16px;
+            outline: none;
+            transition: 0.2s;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        .search-bar:focus {
+            background: rgba(255, 255, 255, 0.95);
+            transform: scale(1.02);
+        }
+
+        /* === 搜索引擎图标切换按钮 === */
+        .search-engine-toggle {
+            position: absolute;
+            left: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            background: transparent;
+            border: none;
+            cursor: pointer;
+            padding: 6px 10px;
+            border-radius: 8px;
+            transition: all 0.2s;
+            z-index: 10;
+        }
+
+        .search-engine-toggle:hover {
+            background: rgba(0, 0, 0, 0.05);
+        }
+
+        .search-engine-toggle:active {
+            transform: translateY(-50%) scale(0.95);
+        }
+
+        /* 引擎图标 */
+        .engine-icon {
+            width: 20px;
+            height: 20px;
+            transition: opacity 0.3s;
+            flex-shrink: 0;
+        }
+
+        .engine-icon.hidden {
+            display: none;
+        }
+
+        /* 切换图标 */
+        .toggle-icon {
+            width: 14px;
+            height: 14px;
+            opacity: 0.5;
+            transition: opacity 0.2s;
+            flex-shrink: 0;
+        }
+
+        .search-engine-toggle:hover .toggle-icon {
+            opacity: 0.8;
+        }
+
+        /* 搜索框 padding 调整，留出左侧图标空间 */
+        .search-bar {
+            padding: 0 50px 0 75px !important;
+        }
+
+        .grid-container {
+            width: 100%;
+            max-width: 1200px;
+            padding: 0 30px 60px 30px;
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
+            gap: 24px;
+        }
+
+        .glass-card {
+            /* 正方形布局 */
+            aspect-ratio: 1 / 1;
+            width: 100%;
+
+            /* iOS 风格大圆角 */
+            border-radius: 22px;
+
+            /* 升级玻璃拟态 */
+            background: rgba(255, 255, 255, 0.12);
+            backdrop-filter: blur(20px) saturate(180%);
+            -webkit-backdrop-filter: blur(20px) saturate(180%);
+
+            /* 细微边框增加立体感 */
+            border: 1px solid rgba(255, 255, 255, 0.18);
+
+            /* 柔和阴影 - 移除 inset 避免断层 */
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+
+            /* 布局 */
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            gap: 8px;
+            padding: 12px;
+
+            /* 基础样式 */
+            cursor: pointer;
+            text-decoration: none;
+            color: white;
+            position: relative;
+
+            /* 强化 GPU 加速 - 关键修复 */
+            transform: translate3d(0, 0, 0);
+            backface-visibility: hidden;
+            -webkit-backface-visibility: hidden;
+            -webkit-font-smoothing: antialiased;
+            will-change: transform, backdrop-filter;
+
+            /* 隔离渲染层 */
+            isolation: isolate;
+
+            /* 细化过渡 - 关键修复 */
+            transition:
+                transform 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+                box-shadow 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+                background-color 0.25s ease-out,
+                border-color 0.25s ease-out;
+        }
+
+        .glass-card:hover {
+            /* 上浮效果 */
+            transform: translate3d(0, -8px, 0) scale(1.02);
+
+            /* 增强背景 */
+            background-color: rgba(255, 255, 255, 0.2);
+
+            /* 增强边框 */
+            border-color: rgba(255, 255, 255, 0.3);
+
+            /* 增强阴影 */
+            box-shadow:
+                0 20px 40px rgba(0, 0, 0, 0.2),
+                0 0 0 1px rgba(255, 255, 255, 0.3);
+        }
+
+        .app-icon {
+            width: 52px;
+            height: 52px;
+            border-radius: 12px;
+            background: #fff;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+
+            /* 优化图标过渡 */
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            will-change: transform;
+        }
+
+        .glass-card:hover .app-icon {
+            transform: scale(1.1);
+        }
+
+        .app-icon img {
+            width: 36px;
+            height: 36px;
+            object-fit: contain;
+        }
+
+        .app-name {
+            font-size: 13px;
+            font-weight: 500;
+            text-align: center;
+            width: 100%;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            color: rgba(255, 255, 255, 0.95);
+            text-shadow:
+                0 1px 3px rgba(0, 0, 0, 0.8),
+                0 0 8px rgba(0, 0, 0, 0.4);
+            letter-spacing: 0.3px;
+        }
+
+        .folder-title {
+            grid-column: 1 / -1;
+            font-size: 1.1em;
+            font-weight: 600;
+            text-align: left;
+            margin-top: 40px;
+            margin-bottom: 12px;
+            padding-bottom: 10px;
+            border-bottom: 1.5px solid rgba(255, 255, 255, 0.25);
+            color: rgba(255, 255, 255, 0.95);
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8);
+            letter-spacing: 0.5px;
+        }
+
+        .folder-title:first-of-type {
+            margin-top: 0;
+        }
+
+        /* === 背景设置面板样式 === */
+        .bg-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 10000;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .bg-modal.hidden {
+            display: none;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+            }
+
+            to {
+                opacity: 1;
+            }
+        }
+
+        .bg-modal-content {
+            background: linear-gradient(135deg, rgba(255, 255, 255, 0.95), rgba(255, 255, 255, 0.9));
+            border-radius: 20px;
+            padding: 30px;
+            max-width: 500px;
+            width: 90%;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            animation: slideUp 0.3s ease;
+        }
+
+        @keyframes slideUp {
+            from {
+                transform: translateY(50px);
+                opacity: 0;
+            }
+
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+
+        .bg-modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .bg-modal-header h2 {
+            margin: 0;
+            font-size: 20px;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .bg-close-btn {
+            background: none;
+            border: none;
+            font-size: 30px;
+            cursor: pointer;
+            color: #999;
+            transition: color 0.2s, transform 0.2s;
+            line-height: 1;
+            padding: 0;
+        }
+
+        .bg-close-btn:hover {
+            color: #333;
+            transform: rotate(90deg);
+        }
+
+        /* 上传区域 */
+        .bg-upload-section {
+            margin-bottom: 30px;
+        }
+
+        .bg-upload-btn {
+            width: 100%;
+            padding: 40px 20px;
+            border: 2px dashed #ccc;
+            border-radius: 16px;
+            background: linear-gradient(135deg, #f8f8f8, #fff);
+            cursor: pointer;
+            transition: all 0.3s;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .bg-upload-btn:hover {
+            border-color: #4CAF50;
+            background: linear-gradient(135deg, #e8f5e9, #f1f8e9);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(76, 175, 80, 0.2);
+        }
+
+        .upload-icon {
+            font-size: 36px;
+        }
+
+        .upload-text {
+            font-size: 16px;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .upload-hint {
+            font-size: 12px;
+            color: #999;
+            margin: 0;
+        }
+
+        /* 历史记录 */
+        .bg-history-section {
+            margin-top: 20px;
+        }
+
+        .bg-history-section h3 {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 12px;
+            color: #666;
+        }
+
+        .bg-history-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+        }
+
+        .bg-history-item {
+            aspect-ratio: 16 / 10;
+            border-radius: 12px;
+            overflow: hidden;
+            cursor: pointer;
+            border: 3px solid transparent;
+            transition: all 0.3s;
+            position: relative;
+        }
+
+        .bg-history-item:hover {
+            border-color: #4CAF50;
+            transform: scale(1.05);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+        }
+
+        .bg-history-item img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .bg-history-item .delete-btn {
+            position: absolute;
+            top: 4px;
+            right: 4px;
+            background: rgba(255, 0, 0, 0.8);
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            font-size: 14px;
+            cursor: pointer;
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+
+        .bg-history-item:hover .delete-btn {
+            opacity: 1;
+        }
+
+        /* 视频背景 */
+        .bg-video {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            z-index: -2;
+        }
+
+        .bg-video.hidden {
+            display: none;
+        }
+
+        /* === 新增：兜底文字图标样式 === */
+        .fallback-icon {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 20px;
+            font-weight: bold;
+            color: white;
+            text-transform: uppercase;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="search-container">
+        <!-- 搜索引擎图标切换按钮 -->
+        <button class="search-engine-toggle" id="searchEngineToggle" title="切换搜索引擎">
+            <!-- Bing 图标 -->
+            <svg class="engine-icon bing-icon" id="bingIcon" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+                <path
+                    d="M911.36 426.666667L433.493333 238.933333c-6.826667-3.413333-13.653333 0-17.066666 3.413334-6.826667 6.826667-6.826667 13.653333-6.826667 20.48l102.4 238.933333 10.24 10.24 146.773333 40.96-416.426666 225.28 116.053333-98.986667c3.413333-3.413333 6.826667-6.826667 6.826667-13.653333V102.4c0-6.826667-3.413333-13.653333-10.24-17.066667L126.293333 0c-6.826667 0-13.653333 0-17.066666 3.413333-3.413333 3.413333-6.826667 6.826667-6.826667 13.653334v853.333333c0 3.413333 0 3.413333 3.413333 6.826667l3.413334 3.413333 3.413333 3.413333 238.933333 136.533334c3.413333 0 6.826667 3.413333 6.826667 3.413333 3.413333 0 6.826667 0 10.24-3.413333l546.133333-341.333334c3.413333-3.413333 6.826667-10.24 6.826667-13.653333V443.733333c0-6.826667-3.413333-13.653333-10.24-17.066666z"
+                    fill="#1296db" />
+            </svg>
+
+            <!-- Google 图标 -->
+            <svg class="engine-icon google-icon hidden" id="googleIcon" viewBox="0 0 1024 1024"
+                xmlns="http://www.w3.org/2000/svg">
+                <path
+                    d="M222.087529 515.915294c0-32.527059 5.481412-63.698824 15.179295-92.973176l-170.285177-128.90353A496.941176 496.941176 0 0 0 15.058824 515.945412c0 79.721412 18.672941 154.955294 51.802352 221.726117l170.255059-129.114353a293.767529 293.767529 0 0 1-15.028706-92.611764"
+                    fill="#FBBC05" />
+                <path
+                    d="M521.246118 219.979294a294.460235 294.460235 0 0 1 186.337882 65.957647l147.245176-145.648941C765.108706 62.885647 650.089412 15.058824 521.246118 15.058824 321.204706 15.058824 149.293176 128.421647 66.981647 294.038588l170.405647 128.90353c39.243294-118.061176 151.100235-202.992941 283.919059-202.992942"
+                    fill="#EA4335" />
+                <path
+                    d="M523.414588 805.315765c-133.511529 0-245.940706-84.359529-285.394823-201.728l-171.188706 128.12047C149.564235 896.301176 322.349176 1008.941176 523.444706 1008.941176c124.024471 0 242.447059-43.128471 331.38447-124.054588l-162.514823-123.090823c-45.808941 28.310588-103.574588 43.550118-168.929882 43.550117"
+                    fill="#34A853" />
+                <path
+                    d="M1008.941176 511.216941c0-29.394824-4.638118-61.108706-11.565176-90.503529H523.354353v192.301176h272.835765c-13.613176 65.596235-50.718118 115.983059-103.875765 148.781177l162.484706 123.090823c93.394824-84.901647 154.142118-211.425882 154.142117-373.669647"
+                    fill="#4285F4" />
+            </svg>
+
+            <!-- 切换图标 -->
+            <svg class="toggle-icon" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+                <path
+                    d="M448 832v64l-128.32-128L448 640v64h192a192 192 0 0 0 115.84-345.152l0.704-0.896 90.24-90.24A320 320 0 0 1 640 832l-192.064 0.064zM576 192V128l131.008 128L576 384V320H384a192 192 0 0 0-115.712 345.216l-91.072 91.008A320 320 0 0 1 384 192h192.064z"
+                    fill="#666666" />
+            </svg>
+        </button>
+
+        <input type="text" class="search-bar" placeholder="搜索..." id="searchInput">
+    </div>
+
+    <div class="grid-container" id="bookmarkGrid">
+    </div>
+
+    <!-- 自定义背景设置面板 -->
+    <div id="bgSettingsModal" class="bg-modal hidden">
+        <div class="bg-modal-content">
+            <div class="bg-modal-header">
+                <h2>修改背景图片/视频</h2>
+                <button class="bg-close-btn" id="closeBgModal">×</button>
+            </div>
+
+            <div class="bg-modal-body">
+                <!-- 上传区域 -->
+                <div class="bg-upload-section">
+                    <input type="file" id="bgFileInput" accept="image/*,video/*" hidden>
+                    <button class="bg-upload-btn" id="uploadBgBtn">
+                        <span class="upload-icon">📁</span>
+                        <span class="upload-text">选择文件</span>
+                        <p class="upload-hint">支持 JPG, PNG, WebP, MP4, WebM</p>
+                    </button>
+                </div>
+
+                <!-- 历史记录 -->
+                <div class="bg-history-section">
+                    <h3>最近使用</h3>
+                    <div class="bg-history-grid" id="bgHistoryGrid">
+                        <!-- 动态生成缩略图 -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 视频背景容器 -->
+    <video id="bgVideo" class="bg-video hidden" autoplay muted loop playsinline></video>
+
+    <script src="LocalBGCache.js"></script>
+    <script src="bgSystem.js"></script>
+    <script src="faviconCache.js"></script>
+    <script src="newtab.js"></script>
+
+</body>
+
+</html>
