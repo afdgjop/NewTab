@@ -9,6 +9,9 @@ const FaviconCache = (function() {
     const DB_VERSION = 1;
     const STORE_NAME = 'icons';
     const CACHE_DURATION = 10 * 24 * 60 * 60 * 1000; // 10天（毫秒）
+    const CLEANUP_INTERVAL = 24 * 60 * 60 * 1000;
+    const CLEANUP_KEY = 'faviconCacheLastCleanup';
+    const MAX_ICON_BYTES = 256 * 1024;
 
     let dbInstance = null;
 
@@ -31,26 +34,27 @@ const FaviconCache = (function() {
 
             request.onsuccess = () => {
                 dbInstance = request.result;
+                dbInstance.onversionchange = () => {
+                    dbInstance.close();
+                    dbInstance = null;
+                };
                 console.log('IndexedDB 初始化成功');
                 resolve(dbInstance);
             };
 
-            // 数据库升级时创建对象存储
+            // 数据库升级时保留已有缓存，只补齐缺失的结构
             request.onupgradeneeded = (event) => {
                 const db = event.target.result;
-                
-                // 如果存储已存在则删除
-                if (db.objectStoreNames.contains(STORE_NAME)) {
-                    db.deleteObjectStore(STORE_NAME);
+                let objectStore;
+                if (!db.objectStoreNames.contains(STORE_NAME)) {
+                    objectStore = db.createObjectStore(STORE_NAME, { keyPath: 'hostname' });
+                } else {
+                    objectStore = request.transaction.objectStore(STORE_NAME);
                 }
-
-                // 创建对象存储，以 hostname 为主键
-                const objectStore = db.createObjectStore(STORE_NAME, { keyPath: 'hostname' });
-                
-                // 创建索引以便按时间查询
-                objectStore.createIndex('expiresAt', 'expiresAt', { unique: false });
-                
-                console.log('对象存储创建成功');
+                if (!objectStore.indexNames.contains('expiresAt')) {
+                    objectStore.createIndex('expiresAt', 'expiresAt', { unique: false });
+                }
+                console.log('对象存储结构已就绪');
             };
         });
     }
@@ -188,7 +192,7 @@ const FaviconCache = (function() {
             
             return new Promise((resolve, reject) => {
                 // 使用游标遍历所有记录
-                const request = store.openCursor();
+                const request = index.openCursor(IDBKeyRange.upperBound(now));
                 
                 request.onsuccess = (event) => {
                     const cursor = event.target.result;
@@ -221,6 +225,18 @@ const FaviconCache = (function() {
             console.error('清理过期缓存时出错:', error);
             return 0;
         }
+    }
+
+    /**
+     * 按间隔清理过期缓存，避免每个新标签页都全量扫描 IndexedDB。
+     */
+    async function clearExpiredCacheIfNeeded() {
+        const now = Date.now();
+        const lastCleanup = Number(localStorage.getItem(CLEANUP_KEY) || 0);
+        if (now - lastCleanup < CLEANUP_INTERVAL) return 0;
+        const deletedCount = await clearExpiredCache();
+        localStorage.setItem(CLEANUP_KEY, String(now));
+        return deletedCount;
     }
 
     /**
@@ -257,32 +273,16 @@ const FaviconCache = (function() {
      * @returns {Promise<string>} Base64 数据
      */
     async function urlToBase64(url) {
+        const response = await fetch(url, { cache: 'force-cache' });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const blob = await response.blob();
+        if (!blob.type.startsWith('image/')) throw new Error('响应不是图片');
+        if (blob.size > MAX_ICON_BYTES) throw new Error('图标文件过大');
         return new Promise((resolve, reject) => {
-            const img = new Image();
-            img.crossOrigin = 'Anonymous'; // 处理跨域
-            
-            img.onload = () => {
-                try {
-                    const canvas = document.createElement('canvas');
-                    canvas.width = img.width;
-                    canvas.height = img.height;
-                    
-                    const ctx = canvas.getContext('2d');
-                    ctx.drawImage(img, 0, 0);
-                    
-                    const dataURL = canvas.toDataURL('image/png');
-                    resolve(dataURL);
-                } catch (error) {
-                    console.error('转换 Base64 失败:', error);
-                    reject(error);
-                }
-            };
-            
-            img.onerror = () => {
-                reject(new Error('图片加载失败'));
-            };
-            
-            img.src = url;
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result);
+            reader.onerror = () => reject(reader.error || new Error('读取图标失败'));
+            reader.readAsDataURL(blob);
         });
     }
 
@@ -293,6 +293,7 @@ const FaviconCache = (function() {
         saveCachedIcon,
         deleteCachedIcon,
         clearExpiredCache,
+        clearExpiredCacheIfNeeded,
         clearAllCache,
         urlToBase64
     };

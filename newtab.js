@@ -5,7 +5,7 @@
 // 背景配置
 const CONFIG = {
     localJpg: 'assets/background.jpg',
-    localPng: 'assets/background.png'
+    localPng: 'assets/background2.png'
 };
 
 // 搜索引擎配置
@@ -33,7 +33,7 @@ const SearchEngineManager = {
     async getEngine() {
         return new Promise((resolve) => {
             chrome.storage.local.get(['searchEngine'], (result) => {
-                const engine = result.searchEngine || DEFAULT_SEARCH_ENGINE;
+                const engine = SEARCH_ENGINES[result.searchEngine] ? result.searchEngine : DEFAULT_SEARCH_ENGINE;
                 console.log('当前搜索引擎:', engine);
                 resolve(engine);
             });
@@ -46,6 +46,9 @@ const SearchEngineManager = {
      * @returns {Promise<void>}
      */
     async setEngine(engine) {
+        if (!SEARCH_ENGINES[engine]) {
+            throw new Error(`不支持的搜索引擎: ${engine}`);
+        }
         return new Promise((resolve) => {
             chrome.storage.local.set({ searchEngine: engine }, () => {
                 console.log('搜索引擎已切换为:', SEARCH_ENGINES[engine].name);
@@ -67,19 +70,19 @@ const SearchEngineManager = {
 };
 
 document.addEventListener('DOMContentLoaded', async function () {
+    // 先同步设置默认背景，避免与异步恢复自定义背景产生竞态。
+    handleBackgroundFallback();
+
     // 初始化 Favicon 缓存数据库
     try {
         await FaviconCache.initDB();
         // 清理过期缓存（异步执行，不阻塞页面加载）
-        FaviconCache.clearExpiredCache().catch(err => {
+        FaviconCache.clearExpiredCacheIfNeeded().catch(err => {
             console.warn('清理过期缓存失败:', err);
         });
     } catch (error) {
         console.error('初始化 FaviconCache 失败:', error);
     }
-
-    // 初始化背景
-    handleBackgroundFallback();
 
     // 初始化书签
     // 检查是否有 Chrome API 权限
@@ -89,12 +92,13 @@ document.addEventListener('DOMContentLoaded', async function () {
             if (!grid) return;
 
             // 逻辑：尝试寻找名为 "收藏夹栏" 或 "Bookmarks Bar" 的节点，或者直接取 ID 为 '1' 的节点
-            const rootNode = bookmarkTreeNodes[0];
-            const bookmarksBar = rootNode.children.find(
+            const rootNode = Array.isArray(bookmarkTreeNodes) ? bookmarkTreeNodes[0] : null;
+            const rootChildren = Array.isArray(rootNode?.children) ? rootNode.children : [];
+            const bookmarksBar = rootChildren.find(
                 node => node.id === '1' || node.title === '收藏夹栏' || node.title === 'Bookmarks Bar'
-            ) || rootNode.children[0]; // 兜底
+            ) || rootChildren[0];
 
-            if (bookmarksBar && bookmarksBar.children) {
+            if (Array.isArray(bookmarksBar?.children)) {
                 processBookmarkNodes(bookmarksBar.children, grid);
             }
         });
@@ -115,7 +119,9 @@ document.addEventListener('DOMContentLoaded', async function () {
 function updateEngineIcon(engine) {
     const bingIcon = document.getElementById('bingIcon');
     const googleIcon = document.getElementById('googleIcon');
+    if (!bingIcon || !googleIcon) return;
 
+    engine = SEARCH_ENGINES[engine] ? engine : DEFAULT_SEARCH_ENGINE;
     if (engine === 'bing') {
         bingIcon.classList.remove('hidden');
         googleIcon.classList.add('hidden');
@@ -154,7 +160,8 @@ async function initSearch() {
     });
 
     // 监听搜索框回车事件
-    searchInput.addEventListener('keypress', function (e) {
+    searchInput.addEventListener('keydown', function (e) {
+        if (e.isComposing || e.keyCode === 229) return;
         if (e.key === 'Enter') {
             const query = this.value.trim();
             if (query) {
@@ -167,26 +174,21 @@ async function initSearch() {
 }
 
 function processBookmarkNodes(nodes, container) {
+    const fragment = document.createDocumentFragment();
     nodes.forEach(node => {
-        // 如果是文件夹
         if (node.children && node.children.length > 0) {
-            // 创建文件夹标题
             const folderTitle = document.createElement('h2');
             folderTitle.className = 'folder-title';
             folderTitle.textContent = node.title;
-            container.appendChild(folderTitle);
-
-            // 遍历文件夹内的书签
+            fragment.appendChild(folderTitle);
             node.children.forEach(childNode => {
-                // 仅渲染具体网页，忽略嵌套文件夹以保持界面扁平
-                if (childNode.url) createBookmarkCard(childNode, container);
+                if (childNode.url) createBookmarkCard(childNode, fragment);
             });
-        }
-        // 如果是顶级书签
-        else if (node.url) {
-            createBookmarkCard(node, container);
+        } else if (node.url) {
+            createBookmarkCard(node, fragment);
         }
     });
+    container.appendChild(fragment);
 }
 
 function createBookmarkCard(node, container) {
@@ -266,7 +268,9 @@ async function loadSmartIcon(url, title, container) {
 function displayCachedIcon(container, base64Data, title) {
     const img = document.createElement('img');
     img.src = base64Data;
-    img.alt = title;
+    img.alt = title || '';
+    img.decoding = 'async';
+    img.loading = 'lazy';
     img.onerror = () => {
         img.remove();
         addFallbackIcon(container, title);
@@ -285,7 +289,9 @@ function loadLocalFavicon(container, pageUrl, title, hostname) {
 
     const img = document.createElement('img');
     img.src = internalFaviconUrl.toString();
-    img.alt = title;
+    img.alt = title || '';
+    img.decoding = 'async';
+    img.loading = 'lazy';
 
     img.onerror = () => {
         img.remove();
@@ -336,7 +342,9 @@ function loadLocalFaviconFallback(container, hostname, title) {
 
     const img = document.createElement('img');
     img.src = internalFaviconUrl.toString();
-    img.alt = title;
+    img.alt = title || '';
+    img.decoding = 'async';
+    img.loading = 'lazy';
 
     img.onerror = () => {
         img.remove();
@@ -353,33 +361,23 @@ function addFallbackIcon(container, title) {
     if (container.querySelector('.fallback-icon')) return;
 
     const fallbackIcon = document.createElement('div');
-    const letter = (title && title.length > 0) ? title.charAt(0).toUpperCase() : '?';
+    const safeTitle = typeof title === 'string' ? title : '';
+    const letter = safeTitle ? safeTitle.charAt(0).toUpperCase() : '?';
     fallbackIcon.textContent = letter;
     fallbackIcon.className = 'fallback-icon';
 
     const colors = ['#e74c3c', '#8e44ad', '#3498db', '#16a085', '#f39c12', '#2c3e50', '#27ae60', '#d35400'];
-    const randomColor = colors[title.charCodeAt(0) % colors.length] || colors[0]; // 根据标题固定颜色，防止刷新变色
-    fallbackIcon.style.background = randomColor;
+    const charCode = safeTitle ? safeTitle.charCodeAt(0) : 0;
+    fallbackIcon.style.background = colors[charCode % colors.length];
 
     container.appendChild(fallbackIcon);
 }
 
 // === 3. 背景处理 ===
 function handleBackgroundFallback() {
-    const body = document.body;
-
-    const setBg = (url) => {
-        body.style.backgroundImage = `url('${url}')`;
-    };
-
-    // 1. 尝试本地 JPG
-    const imgJpg = new Image();
-    imgJpg.onload = () => setBg(CONFIG.localJpg);
-    imgJpg.onerror = () => {
-        // 2. 失败则尝试本地 PNG，如果都失败则不设置背景(回退到CSS默认颜色)
-        const imgPng = new Image();
-        imgPng.onload = () => setBg(CONFIG.localPng);
-        imgPng.src = CONFIG.localPng;
-    };
-    imgJpg.src = CONFIG.localJpg;
+    // 同步设置双层本地背景：JPG 加载失败时浏览器自动尝试 PNG，避免异步 onload 覆盖用户自定义背景。
+    document.body.style.backgroundImage = `url("${CONFIG.localJpg}"), url("${CONFIG.localPng}")`;
+    document.body.style.backgroundSize = 'cover';
+    document.body.style.backgroundPosition = 'center';
+    document.body.style.backgroundRepeat = 'no-repeat';
 }

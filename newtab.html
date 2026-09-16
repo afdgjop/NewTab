@@ -4,7 +4,6 @@
 <head>
     <meta charset="UTF-8">
     <title>NewTab</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         :root {
             --glass-bg: rgba(255, 255, 255, 0.15);
@@ -132,8 +131,8 @@
 
             /* 升级玻璃拟态 */
             background: rgba(255, 255, 255, 0.12);
-            backdrop-filter: blur(20px) saturate(180%);
-            -webkit-backdrop-filter: blur(20px) saturate(180%);
+            backdrop-filter: blur(14px) saturate(160%);
+            -webkit-backdrop-filter: blur(14px) saturate(160%);
 
             /* 细微边框增加立体感 */
             border: 1px solid rgba(255, 255, 255, 0.18);
@@ -155,14 +154,8 @@
             color: white;
             position: relative;
 
-            /* 强化 GPU 加速 - 关键修复 */
-            transform: translate3d(0, 0, 0);
-            backface-visibility: hidden;
-            -webkit-backface-visibility: hidden;
+            /* 避免为每个书签长期创建独立合成层 */
             -webkit-font-smoothing: antialiased;
-            will-change: transform, backdrop-filter;
-
-            /* 隔离渲染层 */
             isolation: isolate;
 
             /* 细化过渡 - 关键修复 */
@@ -202,7 +195,6 @@
 
             /* 优化图标过渡 */
             transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            will-change: transform;
         }
 
         .glass-card:hover .app-icon {
@@ -460,6 +452,18 @@
             color: white;
             text-transform: uppercase;
         }
+
+        @media (prefers-reduced-motion: reduce) {
+            .glass-card,
+            .app-icon,
+            .search-bar,
+            .search-engine-toggle,
+            .bg-modal,
+            .bg-modal-content {
+                transition: none !important;
+                animation: none !important;
+            }
+        }
     </style>
 </head>
 
@@ -517,7 +521,7 @@
             <div class="bg-modal-body">
                 <!-- 上传区域 -->
                 <div class="bg-upload-section">
-                    <input type="file" id="bgFileInput" accept="image/*,video/*" hidden>
+                    <input type="file" id="bgFileInput" accept=".jpg,.jpeg,.png,.webp,.mp4,.webm" hidden>
                     <button class="bg-upload-btn" id="uploadBgBtn">
                         <span class="upload-icon">📁</span>
                         <span class="upload-text">选择文件</span>
