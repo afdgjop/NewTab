@@ -22,7 +22,7 @@ jobs:
         run: node scripts/verify.mjs
       - name: Read version
         id: meta
-        run: echo "version=$(node -p \"require('./manifest.json').version\")" >> "$GITHUB_OUTPUT"
+        run: node -e "console.log('version=' + require('./manifest.json').version)" >> "$GITHUB_OUTPUT"
       - name: Check tag version
         if: github.ref_type == 'tag'
         run: test "${GITHUB_REF_NAME#v}" = "${{ steps.meta.outputs.version }}"
