@@ -34,12 +34,24 @@ If you have cloned this repository and wish to modify the default search engine 
 const CONFIG = {
     // Your default local wallpapers (Placed in the assets/ directory)
     localJpg: 'assets/background.jpg',
-    localPng: 'assets/background.png'
+    localPng: 'assets/background2.png'
 };
 
 // You can also modify the DEFAULT_SEARCH_ENGINE variable. (Options: 'bing' or 'google')
 const DEFAULT_SEARCH_ENGINE = 'bing';
 ```
+
+## Development Verification
+
+Before committing or packaging a release, run:
+
+```bash
+node scripts/verify.mjs
+```
+
+The verifier checks JavaScript syntax, Manifest V3 metadata, the permission allowlist, referenced local resources, default wallpapers, and prevents remote scripts/stylesheets from being introduced into `newtab.html` accidentally. GitHub Actions runs the same check on pushes and pull requests.
+
+To build a distributable ZIP without publishing anything, run the **Package extension** workflow manually in GitHub Actions. Tags named `vX.Y.Z` must match the version in `manifest.json`.
 
 ## 🛠️ Tech Stack
 
@@ -47,6 +59,15 @@ const DEFAULT_SEARCH_ENGINE = 'bing';
 - **Vanilla JS**: 0 external dependencies.
 - **IndexedDB**: Ensures smooth large-scale Base64 cache and video/image saving.
 - **CSS3 Variables & Backdrop-filter**: Realizing modern glass-gradient UI.
+
+## Permissions
+
+- `bookmarks`: read the bookmarks bar for New Tab navigation.
+- `favicon`: use Chrome's internal favicon endpoint as a local fallback.
+- `storage`: store the selected search engine and active wallpaper ID.
+- `https://icons.duckduckgo.com/*`: fetch public favicons when a local cached icon is unavailable.
+
+No broad `<all_urls>` host permission is requested.
 
 ## 🛡️ Privacy Statement
 

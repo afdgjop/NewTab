@@ -1,0 +1,40 @@
+name: Package extension
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify extension
+        run: node scripts/verify.mjs
+      - name: Read version
+        id: meta
+        run: echo "version=$(node -p \"require('./manifest.json').version\")" >> "$GITHUB_OUTPUT"
+      - name: Check tag version
+        if: github.ref_type == 'tag'
+        run: test "${GITHUB_REF_NAME#v}" = "${{ steps.meta.outputs.version }}"
+      - name: Build zip
+        run: |
+          mkdir package
+          cp manifest.json newtab.html newtab.js bgSystem.js faviconCache.js LocalBGCache.js icon.png LICENSE package/
+          cp -R assets package/assets
+          cd package
+          zip -r "../MyNewTab-${{ steps.meta.outputs.version }}.zip" .
+      - uses: actions/upload-artifact@v4
+        with:
+          name: MyNewTab-${{ steps.meta.outputs.version }}
+          path: MyNewTab-${{ steps.meta.outputs.version }}.zip
+          if-no-files-found: error
